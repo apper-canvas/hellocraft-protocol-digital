@@ -2,8 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'react-toastify'
 import ApperIcon from './ApperIcon'
-import tutorialService from '@/services/api/tutorialService'
-
+import tutorialService from '../services/api/tutorialService'
 const MainFeature = () => {
   const [code, setCode] = useState('console.log("Hello, World!");')
   const [output, setOutput] = useState('')
