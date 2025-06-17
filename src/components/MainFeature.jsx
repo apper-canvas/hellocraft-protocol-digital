@@ -1,7 +1,8 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'react-toastify'
 import ApperIcon from './ApperIcon'
+import tutorialService from '@/services/api/tutorialService'
 
 const MainFeature = () => {
   const [code, setCode] = useState('console.log("Hello, World!");')
@@ -9,45 +10,52 @@ const MainFeature = () => {
   const [isRunning, setIsRunning] = useState(false)
   const [currentTutorial, setCurrentTutorial] = useState(0)
   const [showHint, setShowHint] = useState(false)
+  const [tutorials, setTutorials] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState(null)
   const outputRef = useRef(null)
 
-  const tutorials = [
-    {
-      id: 1,
-      title: "Hello World",
-      description: "Learn how to display text with console.log()",
-      code: 'console.log("Hello, World!");',
-      expectedOutput: "Hello, World!",
-      hint: "Use console.log() to display text in the console. Don't forget the quotes around your text!"
-    },
-    {
-      id: 2,
-      title: "Variables",
-      description: "Store and use data with variables",
-      code: 'let name = "JavaScript";\nconsole.log("Hello, " + name + "!");',
-      expectedOutput: "Hello, JavaScript!",
-      hint: "Variables let you store data. Use 'let' to create a variable, then reference it by name."
-    },
-    {
-      id: 3,
-      title: "Numbers",
-      description: "Work with numbers and basic math",
-      code: 'let x = 10;\nlet y = 5;\nconsole.log("Sum:", x + y);',
-      expectedOutput: "Sum: 15",
-      hint: "JavaScript can perform math operations like +, -, *, and /. Try changing the numbers!"
-    },
-    {
-      id: 4,
-      title: "Functions",
-      description: "Create reusable blocks of code",
-      code: 'function greet(name) {\n  return "Hello, " + name + "!";\n}\n\nconsole.log(greet("World"));',
-      expectedOutput: "Hello, World!",
-      hint: "Functions are like mini-programs. Define them with 'function' and call them by name."
+  // Load tutorials from database on component mount
+  useEffect(() => {
+    const loadTutorials = async () => {
+      setIsLoading(true)
+      setError(null)
+      
+      try {
+        const tutorialData = await tutorialService.getAll()
+        
+        if (tutorialData && tutorialData.length > 0) {
+          setTutorials(tutorialData)
+          // Set default code from first tutorial
+          setCode(tutorialData[0].code || 'console.log("Hello, World!");')
+        } else {
+          // Fallback to default tutorial if no data from database
+          const defaultTutorials = [
+            {
+              Id: 1,
+              title: "Hello World",
+              description: "Learn how to display text with console.log()",
+              code: 'console.log("Hello, World!");',
+              expected_output: "Hello, World!",
+              hint: "Use console.log() to display text in the console. Don't forget the quotes around your text!"
+            }
+          ]
+          setTutorials(defaultTutorials)
+          setCode(defaultTutorials[0].code)
+        }
+      } catch (err) {
+        console.error("Failed to load tutorials:", err)
+        setError("Failed to load tutorials. Please try again.")
+        toast.error("Failed to load tutorials")
+      } finally {
+        setIsLoading(false)
+      }
     }
-  ]
+    
+    loadTutorials()
+  }, [])
 
-  const currentTut = tutorials[currentTutorial]
-
+  const currentTut = tutorials[currentTutorial] || {}
   const executeCode = () => {
     setIsRunning(true)
     setOutput('')
@@ -67,11 +75,11 @@ const MainFeature = () => {
       const func = new Function('console', code)
       func(customConsole)
       
-      const result = logs.join('\n') || 'Code executed successfully (no output)'
+const result = logs.join('\n') || 'Code executed successfully (no output)'
       setOutput(result)
       
       // Check if output matches expected (for tutorials)
-      if (currentTut && result.trim() === currentTut.expectedOutput.trim()) {
+      if (currentTut && currentTut.expected_output && result.trim() === currentTut.expected_output.trim()) {
         toast.success('Perfect! You got the expected output! 🎉', {
           className: 'rounded-xl'
         })
@@ -88,18 +96,20 @@ const MainFeature = () => {
     setTimeout(() => setIsRunning(false), 500)
   }
 
-  const loadTutorial = (index) => {
-    setCurrentTutorial(index)
-    setCode(tutorials[index].code)
-    setOutput('')
-    setShowHint(false)
-    toast.info(`Loaded: ${tutorials[index].title}`, {
-      className: 'rounded-xl'
-    })
+const loadTutorial = (index) => {
+    if (tutorials[index]) {
+      setCurrentTutorial(index)
+      setCode(tutorials[index].code || '')
+      setOutput('')
+      setShowHint(false)
+      toast.info(`Loaded: ${tutorials[index].title}`, {
+        className: 'rounded-xl'
+      })
+    }
   }
 
   const resetCode = () => {
-    setCode(currentTut.code)
+    setCode(currentTut.code || '')
     setOutput('')
     setShowHint(false)
     toast.info('Code reset to tutorial example', {
@@ -113,6 +123,41 @@ const MainFeature = () => {
       .replace(/"([^"]*)"/g, '<span class="code-string">"$1"</span>')
       .replace(/\b(\d+)\b/g, '<span class="code-number">$1</span>')
       .replace(/\/\/.*$/gm, '<span class="code-comment">$&</span>')
+  }
+
+// Show loading state
+  if (isLoading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 sm:pb-24">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-surface-600">Loading tutorials...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 sm:pb-24">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <ApperIcon name="AlertCircle" className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-surface-900 mb-2">Failed to Load Tutorials</h3>
+            <p className="text-surface-600 mb-4">{error}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="btn-primary"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -135,7 +180,7 @@ const MainFeature = () => {
             <div className="space-y-2 sm:space-y-3">
               {tutorials.map((tutorial, index) => (
                 <motion.button
-                  key={tutorial.id}
+                  key={tutorial.Id || index}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => loadTutorial(index)}
@@ -183,13 +228,13 @@ const MainFeature = () => {
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="mt-3 text-sm text-secondary-700"
-                  >
-                    {currentTut.hint}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
+className="mt-3 text-sm text-secondary-700"
+                >
+                  {currentTut.hint || "No hint available for this tutorial."}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
           </div>
         </motion.div>
 
@@ -207,13 +252,12 @@ const MainFeature = () => {
                 <div className="flex space-x-2">
                   <div className="w-3 h-3 bg-red-500 rounded-full"></div>
                   <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+<div className="w-3 h-3 bg-green-500 rounded-full"></div>
                 </div>
                 <h4 className="font-medium text-sm sm:text-base">
-                  {currentTut.title} - JavaScript Editor
+                  {currentTut.title || "JavaScript Tutorial"} - JavaScript Editor
                 </h4>
               </div>
-              
               <div className="flex items-center space-x-2">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
@@ -317,10 +361,10 @@ const MainFeature = () => {
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h4 className="font-semibold text-surface-900 mb-1">
+<h4 className="font-semibold text-surface-900 mb-1">
                   Progress: {currentTutorial + 1} of {tutorials.length}
                 </h4>
-                <p className="text-sm text-surface-600">{currentTut.description}</p>
+                <p className="text-sm text-surface-600">{currentTut.description || "Interactive JavaScript tutorial"}</p>
               </div>
               
               <div className="flex items-center space-x-2">
